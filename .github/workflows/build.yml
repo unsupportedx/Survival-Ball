@@ -24,6 +24,11 @@ jobs:
         run: npm install
 
       - name: Cap Init
+      - name: Install Cordova Resources
+        run: npm install -g @capacitor/assets
+
+      - name: Generate Icons
+        run: npx capacitor-assets generate --iconBackgroundColor #000000 --iconBackgroundColorDark #000000
         run: npx cap init "Survival Ball" "com.survival.ball" --web-dir www
 
       - name: Add Android
