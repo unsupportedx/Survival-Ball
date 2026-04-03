@@ -23,29 +23,22 @@ jobs:
       - name: Install
         run: npm install
 
+      - name: Install Capacitor Assets
+        run: npm install -g @capacitor/assets
+
       - name: Cap Init
         run: npx cap init "Survival Ball" "com.survival.ball" --web-dir www
 
       - name: Add Android
         run: npx cap add android
 
-      - name: Sync
-        run: npx cap sync android
-
-      - name: Build APK
+      - name: Generate Icons
         run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug
+          mkdir -p assets
+          cp icon.png assets/icon.png
+          npx capacitor-assets generate --iconBackgroundColor '#ffffff' --iconBackgroundColorDark '#000000' --android
 
-      - name: Release APK
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: latest
-          name: Latest Build
-          files: android/app/build/outputs/apk/debug/app-debug.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}      - name: Sync
+      - name: Sync
         run: npx cap sync android
 
       - name: Build APK
