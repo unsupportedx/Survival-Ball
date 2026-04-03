@@ -24,17 +24,28 @@ jobs:
         run: npm install
 
       - name: Cap Init
-      - name: Install Cordova Resources
-        run: npm install -g @capacitor/assets
-
-      - name: Generate Icons
-        run: npx capacitor-assets generate --iconBackgroundColor #000000 --iconBackgroundColorDark #000000
         run: npx cap init "Survival Ball" "com.survival.ball" --web-dir www
 
       - name: Add Android
         run: npx cap add android
 
       - name: Sync
+        run: npx cap sync android
+
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Release APK
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: latest
+          name: Latest Build
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}      - name: Sync
         run: npx cap sync android
 
       - name: Build APK
