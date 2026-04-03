@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESCAPE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; overflow: hidden; font-family: 'Share Tech Mono', monospace; user-select: none; }
+  #gameCanvas { display: block; cursor: none; }
+  #ui { position: fixed; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: flex-start; padding: 18px 28px; pointer-events: none; z-index: 10; }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat-label { font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 3px; color: #ff3333; text-transform: uppercase; opacity: 0.7; }
+  .stat-value { font-family: 'Orbitron', monospace; font-size: 26px; font-weight: 900; color: #fff; text-shadow: 0 0 20px #ff0000, 0 0 40px #ff000055; line-height: 1; }
+  #level-bar-wrap { position: fixed; bottom: 0; left: 0; right: 0; height: 3px; background: #1a0000; z-index: 10; }
+  #level-bar { height: 100%; background: linear-gradient(90deg, #ff0000, #ff6600); width: 0%; transition: width 0.3s ease; box-shadow: 0 0 8px #ff3300; }
+  #overlay { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
+  #overlay.hidden { display: none; }
+  .title-big { font-family: 'Orbitron', monospace; font-size: clamp(48px, 10vw, 96px); font-weight: 900; color: #fff; letter-spacing: 12px; text-transform: uppercase; line-height: 1; text-shadow: 0 0 40px #ff0000, 0 0 80px #ff000088; animation: titlePulse 2s ease-in-out infinite; }
+  .title-sub { font-family: 'Share Tech Mono', monospace; font-size: clamp(12px, 2vw, 16px); color: #ff3333; letter-spacing: 8px; text-transform: uppercase; margin-top: 12px; opacity: 0.7; }
+  .divider { width: 200px; height: 1px; background: linear-gradient(90deg, transparent, #ff3333, transparent); margin: 40px 0; }
+  .instructions { font-family: 'Share Tech Mono', monospace; font-size: 13px; color: #aaa; text-align: center; line-height: 2.4; letter-spacing: 1px; }
+  .instructions span { color: #ff6666; font-weight: bold; }
+  .start-btn { margin-top: 48px; padding: 16px 64px; background: transparent; border: 2px solid #ff3333; color: #ff3333; font-family: 'Orbitron', monospace; font-size: 14px; font-weight: 700; letter-spacing: 6px; cursor: pointer; text-transform: uppercase; transition: all 0.2s; pointer-events: all; position: relative; overflow: hidden; }
+  .start-btn::before { content: ''; position: absolute; inset: 0; background: #ff3333; transform: scaleX(0); transform-origin: left; transition: transform 0.2s ease; z-index: -1; }
+  .start-btn:hover { color: #000; text-shadow: none; box-shadow: 0 0 30px #ff333366; }
+  .start-btn:hover::before { transform: scaleX(1); }
+  #gameover-title { font-family: 'Orbitron', monospace; font-size: clamp(36px, 8vw, 72px); font-weight: 900; color: #ff0000; letter-spacing: 8px; text-shadow: 0 0 40px #ff0000; animation: glitch 0.3s infinite; }
+  #final-score { font-family: 'Share Tech Mono', monospace; font-size: 16px; color: #fff; letter-spacing: 4px; margin-top: 16px; opacity: 0.8; text-align:center; line-height:2; }
+  #wave-announce { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: 'Orbitron', monospace; font-size: clamp(28px, 5vw, 56px); font-weight: 900; color: #fff; letter-spacing: 8px; text-transform: uppercase; text-shadow: 0 0 40px #ff3300; z-index: 50; pointer-events: none; opacity: 0; transition: opacity 0.4s; text-align: center; }
+  #danger-vignette { position: fixed; inset: 0; pointer-events: none; z-index: 5; background: radial-gradient(ellipse at center, transparent 40%, transparent 60%, #ff000055 100%); opacity: 0; transition: opacity 0.2s; }
+
+  /* Language picker */
+  #lang-screen { text-align: center; }
+  .lang-prompt { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: #666; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 32px; }
+  .lang-btns { display: flex; gap: 16px; justify-content: center; }
+  .lang-btn { padding: 14px 40px; background: transparent; border: 1px solid #333; color: #888; font-family: 'Orbitron', monospace; font-size: 13px; font-weight: 700; letter-spacing: 4px; cursor: pointer; text-transform: uppercase; transition: all 0.2s; pointer-events: all; position: relative; overflow: hidden; }
+  .lang-btn::before { content: ''; position: absolute; inset: 0; background: #ff3333; transform: scaleX(0); transform-origin: left; transition: transform 0.2s ease; z-index: -1; }
+  .lang-btn:hover { color: #fff; border-color: #ff3333; box-shadow: 0 0 20px #ff333344; }
+  .lang-btn:hover::before { transform: scaleX(1); }
+  .lang-btn:hover { color: #000; }
+
+  /* Lang switcher in corner */
+  #lang-switch { position: fixed; bottom: 16px; right: 20px; background: transparent; border: 1px solid #333; color: #555; font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 2px; padding: 6px 12px; cursor: pointer; pointer-events: all; z-index: 200; transition: all 0.2s; text-transform: uppercase; }
+  #lang-switch:hover { color: #ff3333; border-color: #ff3333; }
+
+  @keyframes titlePulse { 0%,100%{text-shadow:0 0 40px #ff0000,0 0 80px #ff000088;}50%{text-shadow:0 0 60px #ff0000,0 0 120px #ff0000aa,0 0 200px #ff000033;} }
+  @keyframes glitch { 0%{transform:translateX(0)}20%{transform:translateX(-3px)}40%{transform:translateX(3px)}60%{transform:translateX(-2px)}80%{transform:translateX(2px)}100%{transform:translateX(0)} }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<div id="ui">
+  <div class="stat"><div class="stat-label" id="lbl-time">TIME</div><div class="stat-value" id="score-display">0s</div></div>
+  <div class="stat" style="text-align:center"><div class="stat-label" id="lbl-level">LEVEL</div><div class="stat-value" id="level-display">1</div></div>
+  <div class="stat" style="text-align:right"><div class="stat-label" id="lbl-enemy">ENEMIES</div><div class="stat-value" id="enemy-display">0</div></div>
+</div>
+<div id="level-bar-wrap"><div id="level-bar"></div></div>
+<div id="danger-vignette"></div>
+<div id="wave-announce"></div>
+<button id="lang-switch">TR / EN</button>
+
+<div id="overlay">
+  <!-- Language picker (shown first time) -->
+  <div id="lang-screen">
+    <div class="lang-prompt">select language / dil seçin</div>
+    <div class="lang-btns">
+      <button class="lang-btn" onclick="chooseLang('en')">English</button>
+      <button class="lang-btn" onclick="chooseLang('tr')">Türkçe</button>
+    </div>
+  </div>
+
+  <!-- Title screen -->
+  <div id="title-screen" style="display:none;text-align:center">
+    <div class="title-big" id="title-word">ESCAPE</div>
+    <div class="title-sub" id="title-sub">survive</div>
+    <div class="divider"></div>
+    <div class="instructions" id="instructions-text"></div>
+    <button class="start-btn" id="start-btn">START</button>
+  </div>
+
+  <!-- Game over -->
+  <div id="gameover-screen" style="display:none;text-align:center">
+    <div id="gameover-title">CAUGHT</div>
+    <div id="final-score"></div>
+    <div class="divider"></div>
+    <button class="start-btn" id="restart-btn">RETRY</button>
+  </div>
+</div>
+
+<script>
+// ── i18n ────────────────────────────────────────────────
+const T = {
+  en: {
+    title: 'ESCAPE', sub: 'survive',
+    instr: '<span>MOUSE</span> — guide the ball<br><span>HOLD LEFT CLICK</span> — speed burst<br><span>DON\'T TOUCH</span> — you\'ll die<br><br>enemies multiply and accelerate',
+    start: 'START', retry: 'RETRY', caught: 'CAUGHT',
+    time: 'TIME', level: 'LEVEL', enemy: 'ENEMIES',
+    wave: 'LEVEL ',
+    score: (s,l,e) => `TIME: ${s}s<br>LEVEL: ${l}<br>ENEMIES: ${e}`
+  },
+  tr: {
+    title: 'KAÇIŞ', sub: 'hayatta kal',
+    instr: '<span>FARE</span> — topu yönlendir<br><span>SOL TIK BASILI TUT</span> — hız patlaması<br><span>DOKUNMA</span> — hayatını kaybedersin<br><br>düşmanlar gittikçe çoğalır ve hızlanır',
+    start: 'BAŞLA', retry: 'TEKRAR DENE', caught: 'YAKALANDIN',
+    time: 'SÜRE', level: 'SEVİYE', enemy: 'DÜŞMAN',
+    wave: 'SEVİYE ',
+    score: (s,l,e) => `SÜRE: ${s}s<br>SEVİYE: ${l}<br>DÜŞMAN: ${e}`
+  }
+};
+
+let lang = localStorage.getItem('escape_lang') || null; // null = not chosen yet
+
+function chooseLang(l) {
+  lang = l;
+  localStorage.setItem('escape_lang', l);
+  applyLang();
+  document.getElementById('lang-screen').style.display = 'none';
+  document.getElementById('title-screen').style.display = 'block';
+}
+
+function applyLang() {
+  if (!lang) return;
+  const t = T[lang];
+  document.getElementById('title-word').textContent = t.title;
+  document.getElementById('title-sub').textContent = t.sub;
+  document.getElementById('instructions-text').innerHTML = t.instr;
+  document.getElementById('start-btn').textContent = t.start;
+  document.getElementById('restart-btn').textContent = t.retry;
+  document.getElementById('gameover-title').textContent = t.caught;
+  document.getElementById('lbl-time').textContent = t.time;
+  document.getElementById('lbl-level').textContent = t.level;
+  document.getElementById('lbl-enemy').textContent = t.enemy;
+  document.title = t.title;
+}
+
+function initOverlay() {
+  if (lang) {
+    // Already chosen — go straight to title
+    applyLang();
+    document.getElementById('lang-screen').style.display = 'none';
+    document.getElementById('title-screen').style.display = 'block';
+  }
+  // else: lang-screen is already visible by default
+}
+
+document.getElementById('lang-switch').addEventListener('click', () => {
+  lang = lang === 'en' ? 'tr' : 'en';
+  localStorage.setItem('escape_lang', lang);
+  applyLang();
+  // If currently on gameover, update those strings live
+  if (state === 'dead') {
+    document.getElementById('gameover-title').textContent = T[lang].caught;
+  }
+});
+
+// ── Canvas / game ────────────────────────────────────────
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize(){
+  const DPR = window.devicePixelRatio || 1;
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+resize(); window.addEventListener('resize', resize);
+
+let state='menu', player, enemies=[], particles=[], score, level, frameCount;
+let mouseX=0, mouseY=0, mouseDown=false, animId;
+
+canvas.addEventListener('mousemove', e=>{ mouseX=e.clientX; mouseY=e.clientY; });
+canvas.addEventListener('mousedown', ()=>mouseDown=true);
+canvas.addEventListener('mouseup', ()=>mouseDown=false);
+canvas.addEventListener('touchmove', e=>{ e.preventDefault(); mouseX=e.touches[0].clientX; mouseY=e.touches[0].clientY; },{passive:false});
+canvas.addEventListener('touchstart', e=>{ e.preventDefault(); mouseX=e.touches[0].clientX; mouseY=e.touches[0].clientY; mouseDown=true; },{passive:false});
+canvas.addEventListener('touchend', ()=>mouseDown=false);
+
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('restart-btn').addEventListener('click', startGame);
+
+function startGame(){
+  document.getElementById('overlay').classList.add('hidden');
+  document.getElementById('danger-vignette').style.opacity=0;
+  state='playing'; score=0; level=1; frameCount=0;
+  mouseX=W/2; mouseY=H/2; mouseDown=false;
+  player={ x:W/2, y:H/2, vx:0, vy:0, r:9, trail:[], boosting:false, alive:true };
+  enemies=[]; particles=[];
+  spawnEnemy(true);
+  document.getElementById('level-display').textContent='1';
+  document.getElementById('enemy-display').textContent='1';
+  if(animId) cancelAnimationFrame(animId);
+  loop();
+}
+
+function spawnEnemy(safe=false){
+  const edge=Math.floor(Math.random()*4); let x,y; const pad=30;
+  if(edge===0){x=Math.random()*W;y=-pad;}
+  else if(edge===1){x=W+pad;y=Math.random()*H;}
+  else if(edge===2){x=Math.random()*W;y=H+pad;}
+  else{x=-pad;y=Math.random()*H;}
+  if(safe){
+    const dx=x-player.x, dy=y-player.y;
+    if(Math.sqrt(dx*dx+dy*dy)<260) return spawnEnemy(true);
+  }
+  const spd=0.35+level*0.05+Math.random()*0.2;
+  const type=Math.random()<0.25?'fast':Math.random()<0.15?'big':'normal';
+  const r=type==='big'?12+Math.random()*4:5+Math.random()*5;
+  enemies.push({ x,y,r,spd,hue:Math.random()*40,angle:0,wobble:Math.random()*Math.PI*2,type });
+}
+
+function emitParticles(x,y,color,count=12,speed=4){
+  for(let i=0;i<count;i++){
+    const a=Math.random()*Math.PI*2, spd=speed*(0.3+Math.random()*0.7);
+    particles.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,life:1,decay:0.02+Math.random()*0.03,r:1.5+Math.random()*3,color});
+  }
+}
+
+let waveTO;
+function showWave(num){
+  const t = T[lang||'en'];
+  const el=document.getElementById('wave-announce');
+  el.textContent=t.wave+num; el.style.opacity='1';
+  clearTimeout(waveTO); waveTO=setTimeout(()=>el.style.opacity='0',1600);
+}
+
+function update(){
+  if(state!=='playing') return;
+  frameCount++; score++;
+  const newLevel=1+Math.floor(score/600);
+  if(newLevel>level){
+    level=newLevel;
+    document.getElementById('level-display').textContent=level;
+    showWave(level);
+    const toAdd=level<=3?1:level<=6?2:Math.min(3,Math.floor(level/3));
+    for(let i=0;i<toAdd;i++) spawnEnemy();
+  }
+  const spawnRate=Math.max(400-level*25,70);
+  if(frameCount%spawnRate===0) spawnEnemy();
+
+  const dx=mouseX-player.x, dy=mouseY-player.y;
+  const dist=Math.sqrt(dx*dx+dy*dy);
+  const boost=mouseDown?2.2:1;
+  player.boosting=mouseDown&&dist>5;
+  const acc=0.56*boost, maxSpd=mouseDown?19:11;
+  if(dist>3){ player.vx+=(dx/dist)*acc; player.vy+=(dy/dist)*acc; }
+  const friction=mouseDown?0.88:0.84;
+  player.vx*=friction; player.vy*=friction;
+  const spd=Math.sqrt(player.vx**2+player.vy**2);
+  if(spd>maxSpd){player.vx=(player.vx/spd)*maxSpd;player.vy=(player.vy/spd)*maxSpd;}
+  player.x=Math.max(player.r,Math.min(W-player.r,player.x+player.vx));
+  player.y=Math.max(player.r,Math.min(H-player.r,player.y+player.vy));
+  if(player.x<=player.r||player.x>=W-player.r) player.vx*=-0.4;
+  if(player.y<=player.r||player.y>=H-player.r) player.vy*=-0.4;
+
+  player.trail.push({x:player.x,y:player.y,life:1});
+  if(player.trail.length>22) player.trail.shift();
+  player.trail.forEach(t=>t.life-=0.05);
+  if(player.boosting&&frameCount%2===0) emitParticles(player.x,player.y,'#00aaff',3,3);
+
+  enemies.forEach(e=>{
+    e.wobble+=0.06; e.angle+=e.type==='fast'?0.12:0.05;
+    const edx=player.x-e.x, edy=player.y-e.y;
+    const eDist=Math.sqrt(edx*edx+edy*edy);
+    let eSpd=e.spd*(e.type==='fast'?1.6:1)*(e.type==='big'?0.7:1);
+    if(eDist<180) eSpd*=(1+(180-eDist)/180*0.6);
+    e.x+=(edx/eDist)*eSpd; e.y+=(edy/eDist)*eSpd;
+    const cDist=Math.sqrt((e.x-player.x)**2+(e.y-player.y)**2);
+    if(cDist<player.r+e.r-3) die();
+    if(frameCount%10===0) emitParticles(e.x,e.y,`hsl(${e.hue+10},100%,60%)`,2,1.2);
+  });
+
+  particles=particles.filter(p=>p.life>0);
+  particles.forEach(p=>{ p.x+=p.vx;p.y+=p.vy;p.vx*=0.93;p.vy*=0.93;p.life-=p.decay; });
+
+  document.getElementById('score-display').textContent=Math.floor(score/60)+'s';
+  document.getElementById('enemy-display').textContent=enemies.length;
+  document.getElementById('level-bar').style.width=((score%600)/600*100)+'%';
+
+  let minDist=Infinity;
+  enemies.forEach(e=>{const d=Math.sqrt((e.x-player.x)**2+(e.y-player.y)**2);if(d<minDist)minDist=d;});
+  document.getElementById('danger-vignette').style.opacity=Math.max(0,Math.min(1,1-minDist/180));
+}
+
+function die(){
+  state='dead';
+  emitParticles(player.x,player.y,'#ff4400',50,9);
+  emitParticles(player.x,player.y,'#ffaa00',30,5);
+  setTimeout(()=>{
+    draw();
+    const t = T[lang||'en'];
+    const overlay=document.getElementById('overlay');
+    document.getElementById('title-screen').style.display='none';
+    document.getElementById('gameover-screen').style.display='block';
+    document.getElementById('gameover-title').textContent=t.caught;
+    document.getElementById('restart-btn').textContent=t.retry;
+    document.getElementById('final-score').innerHTML=t.score(Math.floor(score/60),level,enemies.length);
+    overlay.classList.remove('hidden');
+    document.getElementById('danger-vignette').style.opacity=0;
+  },700);
+}
+
+function loop(){ update(); draw(); if(state!=='dead') animId=requestAnimationFrame(loop); }
+
+function draw(){
+  ctx.fillStyle='#050505';
+  ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='#0e0e0e'; ctx.lineWidth=1;
+  const g=60;
+  for(let x=0;x<W;x+=g){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=g){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+  (particles||[]).forEach(p=>{
+    ctx.globalAlpha=p.life;
+    ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  if(state==='playing'||state==='dead'){
+    player.trail.forEach((t,i)=>{
+      const a=(i/player.trail.length)*t.life*0.35;
+      ctx.globalAlpha=a;
+      ctx.beginPath();
+      ctx.arc(t.x,t.y,player.r*(i/player.trail.length)*0.75,0,Math.PI*2);
+      ctx.fillStyle=player.boosting?'#00ccff':'#ffffff';
+      ctx.fill();
+    });
+    ctx.globalAlpha=1;
+
+    (enemies||[]).forEach(e=>{
+      ctx.save(); ctx.translate(e.x,e.y); ctx.rotate(e.angle);
+      const grd=ctx.createRadialGradient(0,0,e.r*0.2,0,0,e.r*2.8);
+      grd.addColorStop(0,`hsla(${e.hue},100%,65%,0.25)`);
+      grd.addColorStop(1,'transparent');
+      ctx.beginPath(); ctx.arc(0,0,e.r*2.8,0,Math.PI*2);
+      ctx.fillStyle=grd; ctx.fill();
+      const pts=e.type==='fast'?6:e.type==='big'?8:5;
+      ctx.beginPath();
+      for(let i=0;i<pts*2;i++){
+        const a=(i/(pts*2))*Math.PI*2-Math.PI/2;
+        const r2=i%2===0?e.r:e.r*0.45;
+        if(i===0)ctx.moveTo(Math.cos(a)*r2,Math.sin(a)*r2);
+        else ctx.lineTo(Math.cos(a)*r2,Math.sin(a)*r2);
+      }
+      ctx.closePath();
+      ctx.fillStyle=`hsl(${e.hue},100%,50%)`;
+      ctx.shadowBlur=18; ctx.shadowColor=`hsl(${e.hue},100%,65%)`;
+      ctx.fill();
+      ctx.strokeStyle=`hsl(${e.hue},100%,80%)`; ctx.lineWidth=1.5; ctx.stroke();
+      ctx.shadowBlur=0; ctx.restore();
+    });
+
+    if(state==='playing'){
+      ctx.save(); ctx.translate(player.x,player.y);
+      const halo=ctx.createRadialGradient(0,0,player.r,0,0,player.r*3.5);
+      halo.addColorStop(0,player.boosting?'rgba(0,160,255,0.25)':'rgba(255,255,255,0.12)');
+      halo.addColorStop(1,'transparent');
+      ctx.beginPath(); ctx.arc(0,0,player.r*3.5,0,Math.PI*2);
+      ctx.fillStyle=halo; ctx.fill();
+      const bg=ctx.createRadialGradient(-3,-3,1,0,0,player.r);
+      bg.addColorStop(0,player.boosting?'#88eeff':'#ffffff');
+      bg.addColorStop(0.5,player.boosting?'#0077ff':'#cccccc');
+      bg.addColorStop(1,player.boosting?'#002299':'#333333');
+      ctx.beginPath(); ctx.arc(0,0,player.r,0,Math.PI*2);
+      ctx.fillStyle=bg;
+      ctx.shadowBlur=player.boosting?40:18;
+      ctx.shadowColor=player.boosting?'#00aaff':'#ffffff';
+      ctx.fill();
+      ctx.beginPath(); ctx.arc(-3,-3,2.5,0,Math.PI*2);
+      ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.fill();
+      ctx.shadowBlur=0; ctx.restore();
+    }
+  }
+  ctx.fillStyle='rgba(0,0,0,0.025)';
+  for(let y=0;y<H;y+=4) ctx.fillRect(0,y,W,2);
+}
+
+// Boot
+initOverlay();
+draw();
+</script>
+</body>
+</html>
